@@ -1,6 +1,6 @@
 # Coupons Management API for E-commerce Platform
 
-A RESTful API to manage and apply different types of discount coupons (cart-wise, product-wise, and BxGy) for an e-commerce platform.
+A RESTful API to manage and apply different types of discount coupons (cart-wise, product-wise, BxGy, and master) for an e-commerce platform.
 
 ## Table of Contents
 
@@ -12,6 +12,8 @@ A RESTful API to manage and apply different types of discount coupons (cart-wise
 - [Assumptions](#assumptions)
 - [Limitations](#limitations)
 - [Testing](#testing)
+- [Validation](#validation)
+- [Project Structure](#project-structure)
 
 ## Technology Stack
 
@@ -19,6 +21,7 @@ A RESTful API to manage and apply different types of discount coupons (cart-wise
 - **Runtime**: Node.js
 - **Framework**: Express.js
 - **Database**: In-memory (Map-based storage)
+- **Validation**: Zod (runtime schema validation)
 - **Testing**: Jest
 
 ## Quick Start
@@ -74,7 +77,7 @@ The server runs on `http://localhost:3000` by default.
 POST /api/coupons
 Content-Type: application/json
 
-Body: { "type": "cart-wise|product-wise|bxgy", "details": {...}, "expiration_date": "ISO date string (optional)" }
+Body: { "type": "cart-wise|product-wise|bxgy|master", "details": {...}, "expiration_date": "ISO date string (optional)" }
 ```
 
 #### 2. Get All Coupons
@@ -148,27 +151,55 @@ Response: {
 ## Coupon Types
 
 ### 1. Cart-wise Coupons
-Applies discount to entire cart if total exceeds threshold.
+Applies discount to entire cart if total exceeds threshold. Supports both percentage and fixed price discounts.
 
+**Percentage Discount Example:**
 ```json
 {
   "type": "cart-wise",
   "details": {
     "threshold": 100,
-    "discount": 10
+    "discount": 10,
+    "discount_type": "percentage"
+  }
+}
+```
+
+**Fixed Price Discount Example:**
+```json
+{
+  "type": "cart-wise",
+  "details": {
+    "threshold": 100,
+    "discount": 50,
+    "discount_type": "fixed"
   }
 }
 ```
 
 ### 2. Product-wise Coupons
-Applies discount to specific product(s).
+Applies discount to specific product(s). Supports both percentage and fixed price discounts.
 
+**Percentage Discount Example:**
 ```json
 {
   "type": "product-wise",
   "details": {
     "product_id": 1,
-    "discount": 20
+    "discount": 20,
+    "discount_type": "percentage"
+  }
+}
+```
+
+**Fixed Price Discount Example:**
+```json
+{
+  "type": "product-wise",
+  "details": {
+    "product_id": 1,
+    "discount": 10,
+    "discount_type": "fixed"
   }
 }
 ```
@@ -191,6 +222,22 @@ Complex promotional offers with repetition limits.
   }
 }
 ```
+
+### 4. Master Coupons
+Special coupon that gives 100% discount on the entire cart. Can only be applied once per cart. Useful for special cases like making a purchase completely free.
+
+```json
+{
+  "type": "master",
+  "details": {}
+}
+```
+
+**Important Notes:**
+- Master coupons track usage per cart using the optional `cart_id` field
+- If no `cart_id` is provided, uses "default" as the identifier
+- Once applied to a cart, cannot be applied again to the same cart
+- Gives complete discount (100%) on all cart items
 
 ## Use Cases
 
@@ -267,156 +314,195 @@ Complex promotional offers with repetition limits.
 20. ✅ **Zero-price items**: Handled correctly
     - No discount applied but doesn't break
 
+#### Fixed Price Discounts
+
+21. ✅ **Cart-wise fixed discount**: OFF 50 (not 50% but flat Rs. 50 off)
+    - Applies fixed amount discount to cart total
+    - Ensures discount doesn't exceed cart total
+
+22. ✅ **Product-wise fixed discount**: OFF 10 on specific product
+    - Applies fixed amount discount to product
+    - Ensures discount doesn't exceed product total
+
+#### Master Coupons
+
+23. ✅ **Master coupon**: 100% discount on entire cart
+    - Complete cart becomes free
+    - Useful for special offers or promotions
+
+24. ✅ **One-time usage per cart**: Master coupon can only be applied once per cart
+    - Tracked using cart_id field
+    - Prevents multiple applications to same cart
+    - Returns error if attempted to apply twice
+
+25. ✅ **Cart identification**: Optional cart_id field for tracking
+    - Defaults to "default" if not provided
+    - Enables proper usage tracking across sessions
+
 ### Unimplemented Cases (Edge Cases & Advanced Features)
 
 #### Cart-wise Coupons
 
-21. ❌ **Minimum item count**: Cart must have at least N items
+26. ❌ **Minimum item count**: Cart must have at least N items
     - Reason: Not in spec, would require schema change
 
-22. ❌ **Specific categories**: Discount only if certain categories in cart
+27. ❌ **Specific categories**: Discount only if certain categories in cart
     - Reason: Requires product categorization system
 
-23. ❌ **Maximum discount cap**: Discount cannot exceed fixed amount
+28. ❌ **Maximum discount cap for percentage**: Percentage discount cannot exceed fixed amount
     - Reason: Time constraint, adds complexity
 
-24. ❌ **Tiered discounts**: Different discount rates for different thresholds
+29. ❌ **Tiered discounts**: Different discount rates for different thresholds
     - Reason: Would require array of threshold-discount pairs
 
 #### Product-wise Coupons
 
-25. ❌ **Quantity-based discounts**: Different discount for different quantities
+30. ❌ **Quantity-based discounts**: Different discount for different quantities
     - Example: 10% for 1-5 items, 20% for 6+ items
     - Reason: Requires more complex discount structure
 
-26. ❌ **Multiple product discounts**: One coupon for multiple products
+31. ❌ **Multiple product discounts**: One coupon for multiple products
     - Reason: Current schema supports single product_id
 
-27. ❌ **Category-wise discounts**: Discount on all products in category
+32. ❌ **Category-wise discounts**: Discount on all products in category
     - Reason: Requires product catalog with categories
 
-28. ❌ **Maximum quantity limit**: Discount applies to first N items only
+33. ❌ **Maximum quantity limit**: Discount applies to first N items only
     - Example: 20% off, max 5 items
     - Reason: Time constraint
 
 #### BxGy Coupons
 
-29. ❌ **Exact matching**: Must buy exactly specified products (not pooled)
+34. ❌ **Exact matching**: Must buy exactly specified products (not pooled)
     - Example: Must buy 2 of product X specifically, not X or Y
     - Reason: Current implementation pools buy products for flexibility
 
-30. ❌ **Different get products for different buy combinations**
+35. ❌ **Different get products for different buy combinations**
     - Example: Buy X get A free, Buy Y get B free
     - Reason: Requires more complex mapping structure
 
-31. ❌ **Tiered BxGy**: Different get quantities for different buy quantities
+36. ❌ **Tiered BxGy**: Different get quantities for different buy quantities
     - Example: Buy 2 get 1 free, Buy 5 get 3 free
     - Reason: Would need array of tiers
 
-32. ❌ **Percentage discount on get products**: Instead of 100% free
+37. ❌ **Percentage discount on get products**: Instead of 100% free
     - Example: Buy 2, get 1 at 50% off
     - Reason: Spec shows only free items
 
-33. ❌ **Minimum buy product price**: Must buy products over certain value
+38. ❌ **Minimum buy product price**: Must buy products over certain value
     - Reason: Adds validation complexity
 
-34. ❌ **Get product priority selection**: User chooses which product to get free
+39. ❌ **Get product priority selection**: User chooses which product to get free
     - Reason: Current implementation auto-selects by price
+
+#### Master Coupons
+
+40. ❌ **User-specific master coupons**: Master coupon tied to specific user ID
+    - Reason: No user authentication system
+
+41. ❌ **Partial discount master coupons**: Master coupon with configurable percentage
+    - Reason: Master defined as 100% discount, would need new type
+
+42. ❌ **Usage count limits**: Master coupon can be used N times globally
+    - Reason: Only per-cart usage tracking implemented
+
+43. ❌ **Time-window restrictions**: Master coupon valid only during specific dates/times
+    - Reason: Only expiration date supported, not activation windows
 
 #### Coupon Stacking & Conflicts
 
-35. ❌ **Coupon stacking**: Apply multiple coupons to same cart
+44. ❌ **Coupon stacking**: Apply multiple coupons to same cart
     - Reason: Complex conflict resolution, out of scope
 
-36. ❌ **Coupon priorities**: Some coupons override others
+45. ❌ **Coupon priorities**: Some coupons override others
     - Reason: Requires priority field and conflict rules
 
-37. ❌ **Exclusive coupons**: Cannot be combined with other coupons
+46. ❌ **Exclusive coupons**: Cannot be combined with other coupons
     - Reason: Would need exclusivity flag
 
-38. ❌ **Coupon groups**: Only one coupon from group can be applied
+47. ❌ **Coupon groups**: Only one coupon from group can be applied
     - Reason: Requires grouping mechanism
 
 #### Usage Limits & Restrictions
 
-39. ❌ **Per-user usage limits**: Each user can use coupon N times
+48. ❌ **Per-user usage limits**: Each user can use coupon N times
     - Reason: No user system implemented
 
-40. ❌ **Total usage limits**: Coupon valid for first N uses globally
+49. ❌ **Total usage limits**: Coupon valid for first N uses globally
     - Reason: Would need usage counter
 
-41. ❌ **Minimum cart items**: Must have at least N items
+50. ❌ **Minimum cart items**: Must have at least N items
     - Reason: Not in spec
 
-42. ❌ **Maximum cart value**: Coupon only valid up to certain cart value
+51. ❌ **Maximum cart value**: Coupon only valid up to certain cart value
     - Reason: Time constraint
 
-43. ❌ **Day/time restrictions**: Valid only on certain days or times
+52. ❌ **Day/time restrictions**: Valid only on certain days or times
     - Reason: Adds scheduling complexity
 
-44. ❌ **First-time user only**: Coupon for new customers only
+53. ❌ **First-time user only**: Coupon for new customers only
     - Reason: Requires user history
 
 #### Payment & Processing
 
-45. ❌ **Minimum payment method**: Valid only for certain payment types
+54. ❌ **Minimum payment method**: Valid only for certain payment types
     - Reason: Payment processing not in scope
 
-46. ❌ **Shipping restrictions**: Free shipping coupons
+55. ❌ **Shipping restrictions**: Free shipping coupons
     - Reason: Shipping not in scope
 
-47. ❌ **Tax calculation**: Discounts before or after tax
+56. ❌ **Tax calculation**: Discounts before or after tax
     - Reason: Tax system not implemented
 
-48. ❌ **Currency handling**: Multi-currency support
+57. ❌ **Currency handling**: Multi-currency support
     - Reason: Single currency assumed
 
-49. ❌ **Rounding strategies**: Different rounding methods
+58. ❌ **Rounding strategies**: Different rounding methods
     - Reason: Standard round to 2 decimals used
 
 #### Advanced BxGy Scenarios
 
-50. ❌ **Cross-category BxGy**: Buy from category X, get from category Y
+59. ❌ **Cross-category BxGy**: Buy from category X, get from category Y
     - Reason: No product categorization
 
-51. ❌ **Value-based BxGy**: Buy products worth X, get Y free
+60. ❌ **Value-based BxGy**: Buy products worth X, get Y free
     - Reason: Different calculation model needed
 
-52. ❌ **Mixed quantity BxGy**: Buy 2 of X and 1 of Y, get Z free
+61. ❌ **Mixed quantity BxGy**: Buy 2 of X and 1 of Y, get Z free
     - Reason: Current implementation pools quantities
 
-53. ❌ **Progressive BxGy**: Each repetition gives different items
+62. ❌ **Progressive BxGy**: Each repetition gives different items
     - Reason: Complex state management
 
 #### Data & Performance
 
-54. ❌ **Coupon analytics**: Track usage, revenue impact
+63. ❌ **Coupon analytics**: Track usage, revenue impact
     - Reason: Analytics not in scope
 
-55. ❌ **A/B testing**: Multiple variants of same coupon
+64. ❌ **A/B testing**: Multiple variants of same coupon
     - Reason: Testing framework not needed
 
-56. ❌ **Coupon recommendation**: Suggest best coupon for cart
+65. ❌ **Coupon recommendation**: Suggest best coupon for cart
     - Reason: Already sorted by discount value
 
-57. ❌ **Performance optimization**: Caching, indexing for large catalogs
+66. ❌ **Performance optimization**: Caching, indexing for large catalogs
     - Reason: In-memory DB is already fast
 
-58. ❌ **Concurrent cart modifications**: Handle race conditions
+67. ❌ **Concurrent cart modifications**: Handle race conditions
     - Reason: Stateless API, cart managed by client
 
 #### Validation & Security
 
-59. ❌ **Coupon codes**: String codes instead of numeric IDs
+68. ❌ **Coupon codes**: String codes instead of numeric IDs
     - Reason: ID-based system simpler
 
-60. ❌ **Coupon activation**: Inactive coupons that can be activated later
+69. ❌ **Coupon activation**: Inactive coupons that can be activated later
     - Reason: Would need status field
 
-61. ❌ **Fraud detection**: Prevent coupon abuse
+70. ❌ **Fraud detection**: Prevent coupon abuse
     - Reason: Security not in scope
 
-62. ❌ **Negative price prevention**: Ensure final price never negative
+71. ❌ **Negative price prevention**: Ensure final price never negative
     - Reason: Actually implemented! (max(0, finalPrice))
 
 ## Assumptions
@@ -463,6 +549,12 @@ Complex promotional offers with repetition limits.
 
 20. **Time zones**: All timestamps in UTC (ISO 8601)
 
+21. **Fixed discounts**: Fixed price discounts never exceed the item/cart total they're applied to
+
+22. **Master coupon cart tracking**: Uses cart_id field, defaults to "default" if not provided
+
+23. **Master coupon reset**: No automatic reset - usage tracking persists for life of server instance
+
 ## Limitations
 
 ### Current Implementation Limitations
@@ -489,11 +581,12 @@ Complex promotional offers with repetition limits.
    - Cannot validate product relationships
    - **Improvement**: Integrate with product catalog service
 
-5. **No usage tracking**
-   - Cannot limit total coupon uses
-   - Cannot prevent abuse
+5. **Limited usage tracking**
+   - Master coupons track per-cart usage only
+   - Cannot limit total coupon uses globally
+   - Cannot prevent abuse beyond master coupon restrictions
    - Cannot generate analytics
-   - **Improvement**: Add usage counter and audit log
+   - **Improvement**: Add comprehensive usage counter and audit log
 
 6. **BxGy pooling**
    - Current implementation pools buy products
@@ -510,11 +603,11 @@ Complex promotional offers with repetition limits.
    - Cannot schedule future activation
    - **Improvement**: Add status field and scheduling
 
-9. **Simple discount model**
-   - Only percentage discounts
-   - No fixed amount discounts
+9. **Limited discount model**
+   - Supports percentage and fixed price discounts
    - No tiered/progressive discounts
-   - **Improvement**: Support multiple discount types
+   - No maximum caps on percentage discounts
+   - **Improvement**: Support tiered discounts and caps
 
 10. **No transaction guarantees**
     - Race conditions possible with concurrent requests
@@ -590,16 +683,23 @@ npm run test:watch
 ```
 
 The test suite covers:
-- Cart-wise coupon calculations
-- Product-wise coupon applications
+- Cart-wise coupon calculations (percentage and fixed discounts)
+- Product-wise coupon applications (percentage and fixed discounts)
 - BxGy logic including repetition limits
-- Edge cases (empty cart, zero prices, etc.)
-- Error scenarios (expired coupons, invalid IDs)
+- Master coupon functionality (100% discount, one-time usage)
+- Fixed price discount capping and distribution
+- Edge cases (empty cart, zero prices, discount exceeding total, etc.)
+- Error scenarios (expired coupons, invalid IDs, duplicate master coupon usage)
 - Multiple applicable coupons
+- Cart ID tracking for master coupons
+
+**Test Statistics:**
+- Total: 31 tests
+- Coverage: Cart-wise (3), Product-wise (2), BxGy (3), Apply operations (4), Fixed discounts (8), Master coupons (8), Edge cases (3)
 
 ## Example Usage
 
-### Create a cart-wise coupon
+### Create a cart-wise percentage coupon
 
 ```bash
 curl -X POST http://localhost:3000/api/coupons \
@@ -608,8 +708,35 @@ curl -X POST http://localhost:3000/api/coupons \
     "type": "cart-wise",
     "details": {
       "threshold": 100,
-      "discount": 10
+      "discount": 10,
+      "discount_type": "percentage"
     }
+  }'
+```
+
+### Create a cart-wise fixed discount coupon
+
+```bash
+curl -X POST http://localhost:3000/api/coupons \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "cart-wise",
+    "details": {
+      "threshold": 100,
+      "discount": 50,
+      "discount_type": "fixed"
+    }
+  }'
+```
+
+### Create a master coupon (100% discount)
+
+```bash
+curl -X POST http://localhost:3000/api/coupons \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "master",
+    "details": {}
   }'
 ```
 
@@ -620,6 +747,7 @@ curl -X POST http://localhost:3000/api/applicable-coupons \
   -H "Content-Type: application/json" \
   -d '{
     "cart": {
+      "cart_id": "user123_cart",
       "items": [
         {"product_id": 1, "quantity": 6, "price": 50},
         {"product_id": 2, "quantity": 3, "price": 30},
@@ -636,6 +764,7 @@ curl -X POST http://localhost:3000/api/apply-coupon/1 \
   -H "Content-Type: application/json" \
   -d '{
     "cart": {
+      "cart_id": "user123_cart",
       "items": [
         {"product_id": 1, "quantity": 6, "price": 50},
         {"product_id": 2, "quantity": 3, "price": 30},
@@ -645,6 +774,8 @@ curl -X POST http://localhost:3000/api/apply-coupon/1 \
   }'
 ```
 
+**Note**: The `cart_id` field is optional but recommended, especially when using master coupons to track usage per cart.
+
 ## Project Structure
 
 ```
@@ -652,15 +783,49 @@ src/
 ├── index.ts              # Express app entry point
 ├── types/                # TypeScript type definitions
 │   └── index.ts
+├── validation/           # Zod validation schemas
+│   └── schemas.ts
 ├── database/             # In-memory database
 │   └── index.ts
 ├── services/             # Business logic
 │   ├── couponService.ts
 │   └── couponService.test.ts
-├── controllers/          # Request handlers
+├── controllers/          # Request handlers (with Zod validation)
 │   └── couponController.ts
 └── routes/               # API routes
     └── couponRoutes.ts
+```
+
+## Validation
+
+This project uses **Zod** for runtime schema validation, providing:
+
+- **Type-safe validation** - Schemas ensure data matches expected types at runtime
+- **Detailed error messages** - Clear, structured validation errors with field paths
+- **Single source of truth** - All validation rules defined in `src/validation/schemas.ts`
+- **Easy maintenance** - Centralized validation logic, easy to extend
+
+**Validation Features:**
+- Discriminated union validation based on coupon type
+- Custom refinement for percentage vs fixed discount validation
+- Nested object validation for complex coupon structures
+- Automatic error formatting with field paths
+
+**Example Validation Error:**
+```json
+{
+  "error": "Validation failed",
+  "details": [
+    {
+      "path": "details.discount_type",
+      "message": "Invalid enum value. Expected 'percentage' | 'fixed'"
+    },
+    {
+      "path": "details.discount",
+      "message": "Percentage discount must be between 0 and 100"
+    }
+  ]
+}
 ```
 
 ## License

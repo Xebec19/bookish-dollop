@@ -3,6 +3,8 @@ import { Coupon } from '../types';
 class Database {
   private coupons: Map<number, Coupon> = new Map();
   private nextId: number = 1;
+  // Track master coupon usage: Map<couponId, Set<cartId>>
+  private masterCouponUsage: Map<number, Set<string>> = new Map();
 
   createCoupon(coupon: Omit<Coupon, 'id' | 'created_at' | 'updated_at'>): Coupon {
     const now = new Date().toISOString();
@@ -47,6 +49,27 @@ class Database {
   isCouponExpired(coupon: Coupon): boolean {
     if (!coupon.expiration_date) return false;
     return new Date(coupon.expiration_date) < new Date();
+  }
+
+  // Check if master coupon has been used for this cart
+  hasMasterCouponBeenUsed(couponId: number, cartId: string): boolean {
+    const usedCarts = this.masterCouponUsage.get(couponId);
+    return usedCarts ? usedCarts.has(cartId) : false;
+  }
+
+  // Mark master coupon as used for this cart
+  markMasterCouponAsUsed(couponId: number, cartId: string): void {
+    if (!this.masterCouponUsage.has(couponId)) {
+      this.masterCouponUsage.set(couponId, new Set());
+    }
+    this.masterCouponUsage.get(couponId)!.add(cartId);
+  }
+
+  // Reset master coupon usage for a specific cart (optional utility)
+  resetMasterCouponUsageForCart(cartId: string): void {
+    this.masterCouponUsage.forEach((carts) => {
+      carts.delete(cartId);
+    });
   }
 }
 

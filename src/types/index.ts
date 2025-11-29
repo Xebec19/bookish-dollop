@@ -8,6 +8,7 @@ export interface CartItem {
 
 export interface Cart {
   items: CartItem[];
+  cart_id?: string; // Optional identifier to track master coupon usage per cart
 }
 
 export interface UpdatedCart extends Cart {
@@ -17,16 +18,20 @@ export interface UpdatedCart extends Cart {
 }
 
 // Coupon types
-export type CouponType = 'cart-wise' | 'product-wise' | 'bxgy';
+export type CouponType = 'cart-wise' | 'product-wise' | 'bxgy' | 'master';
+
+export type DiscountType = 'percentage' | 'fixed';
 
 export interface CartWiseDetails {
   threshold: number;
-  discount: number; // percentage
+  discount: number;
+  discount_type: DiscountType; // 'percentage' or 'fixed'
 }
 
 export interface ProductWiseDetails {
   product_id: number;
-  discount: number; // percentage
+  discount: number;
+  discount_type: DiscountType; // 'percentage' or 'fixed'
 }
 
 export interface BxGyProduct {
@@ -40,7 +45,12 @@ export interface BxGyDetails {
   repition_limit: number;
 }
 
-export type CouponDetails = CartWiseDetails | ProductWiseDetails | BxGyDetails;
+export interface MasterCouponDetails {
+  // Master coupon gives 100% discount, can only be applied once per cart
+  // No additional configuration needed
+}
+
+export type CouponDetails = CartWiseDetails | ProductWiseDetails | BxGyDetails | MasterCouponDetails;
 
 export interface Coupon {
   id: number;

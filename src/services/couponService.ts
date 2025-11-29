@@ -7,6 +7,7 @@ import {
   CartWiseDetails,
   ProductWiseDetails,
   BxGyDetails,
+  MasterCouponDetails,
 } from '../types';
 import { db } from '../database';
 
@@ -24,7 +25,12 @@ export class CouponService {
   private calculateCartWiseDiscount(cart: Cart, details: CartWiseDetails): number {
     const total = this.calculateCartTotal(cart.items);
     if (total > details.threshold) {
-      return (total * details.discount) / 100;
+      if (details.discount_type === 'percentage') {
+        return (total * details.discount) / 100;
+      } else {
+        // Fixed discount - ensure it doesn't exceed cart total
+        return Math.min(details.discount, total);
+      }
     }
     return 0;
   }
@@ -37,7 +43,12 @@ export class CouponService {
     if (!item) return 0;
 
     const productTotal = item.price * item.quantity;
-    return (productTotal * details.discount) / 100;
+    if (details.discount_type === 'percentage') {
+      return (productTotal * details.discount) / 100;
+    } else {
+      // Fixed discount - ensure it doesn't exceed product total
+      return Math.min(details.discount, productTotal);
+    }
   }
 
   /**
@@ -125,6 +136,21 @@ export class CouponService {
   }
 
   /**
+   * Calculate master coupon discount - gives 100% discount on entire cart
+   * Can only be applied once per cart
+   */
+  private calculateMasterCouponDiscount(cart: Cart, couponId: number): number {
+    // Check if this master coupon has already been used for this cart
+    const cartId = cart.cart_id || 'default';
+    if (db.hasMasterCouponBeenUsed(couponId, cartId)) {
+      return 0;
+    }
+
+    // Return 100% of cart total
+    return this.calculateCartTotal(cart.items);
+  }
+
+  /**
    * Get all applicable coupons for a cart with their discount amounts
    */
   getApplicableCoupons(cart: Cart): ApplicableCoupon[] {
@@ -146,6 +172,9 @@ export class CouponService {
           break;
         case 'bxgy':
           discount = this.calculateBxGyDiscount(cart, coupon.details as BxGyDetails);
+          break;
+        case 'master':
+          discount = this.calculateMasterCouponDiscount(cart, coupon.id);
           break;
       }
 
@@ -191,7 +220,11 @@ export class CouponService {
       case 'cart-wise': {
         const details = coupon.details as CartWiseDetails;
         if (originalTotal > details.threshold) {
-          totalDiscount = (originalTotal * details.discount) / 100;
+          if (details.discount_type === 'percentage') {
+            totalDiscount = (originalTotal * details.discount) / 100;
+          } else {
+            totalDiscount = Math.min(details.discount, originalTotal);
+          }
           // Distribute discount proportionally across all items
           const discountRatio = totalDiscount / originalTotal;
           updatedItems.forEach(item => {
@@ -208,7 +241,12 @@ export class CouponService {
         if (itemIndex !== -1) {
           const item = updatedItems[itemIndex];
           const itemTotal = item.price * item.quantity;
-          const discount = (itemTotal * details.discount) / 100;
+          let discount = 0;
+          if (details.discount_type === 'percentage') {
+            discount = (itemTotal * details.discount) / 100;
+          } else {
+            discount = Math.min(details.discount, itemTotal);
+          }
           item.total_discount = Math.round(discount * 100) / 100;
           totalDiscount = item.total_discount;
         }
@@ -260,6 +298,26 @@ export class CouponService {
             remainingFreeProducts -= freeQty;
           }
         }
+        break;
+      }
+
+      case 'master': {
+        // Check if master coupon has already been used for this cart
+        const cartId = cart.cart_id || 'default';
+        if (db.hasMasterCouponBeenUsed(couponId, cartId)) {
+          throw new Error('Master coupon has already been used for this cart');
+        }
+
+        // Apply 100% discount - distribute proportionally across all items
+        totalDiscount = originalTotal;
+        const discountRatio = 1.0; // 100% discount
+        updatedItems.forEach(item => {
+          const itemTotal = item.price * item.quantity;
+          item.total_discount = Math.round(itemTotal * discountRatio * 100) / 100;
+        });
+
+        // Mark the coupon as used for this cart
+        db.markMasterCouponAsUsed(couponId, cartId);
         break;
       }
     }
