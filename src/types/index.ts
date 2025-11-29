@@ -54,16 +54,20 @@ export type CouponDetails = CartWiseDetails | ProductWiseDetails | BxGyDetails |
 
 export interface Coupon {
   id: number;
+  code: string; // Unique user-friendly code like "DIWALI100"
   type: CouponType;
   details: CouponDetails;
+  tags?: string[]; // Optional tags for categorization like ["seasonal", "diwali"]
   expiration_date?: string; // ISO date string
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateCouponRequest {
+  code: string;
   type: CouponType;
   details: CouponDetails;
+  tags?: string[];
   expiration_date?: string;
 }
 

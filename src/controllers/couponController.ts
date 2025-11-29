@@ -33,8 +33,10 @@ export class CouponController {
       const validatedData = CreateCouponRequestSchema.parse(req.body);
 
       const coupon = db.createCoupon({
+        code: validatedData.code,
         type: validatedData.type,
         details: validatedData.details,
+        tags: validatedData.tags,
         expiration_date: validatedData.expiration_date,
       });
 
@@ -42,6 +44,10 @@ export class CouponController {
     } catch (error) {
       if (error instanceof ZodError) {
         this.handleZodError(error, res);
+        return;
+      }
+      if (error instanceof Error && error.message.includes('already exists')) {
+        res.status(409).json({ error: error.message });
         return;
       }
       res.status(500).json({ error: "Internal server error" });
@@ -84,6 +90,44 @@ export class CouponController {
   }
 
   /**
+   * GET /coupons/code/:code - Get a specific coupon by code
+   */
+  getCouponByCode(req: Request, res: Response): void {
+    try {
+      const code = req.params.code;
+      if (!code) {
+        res.status(400).json({ error: "Coupon code is required" });
+        return;
+      }
+
+      const coupon = db.getCouponByCode(code);
+      if (!coupon) {
+        res.status(404).json({ error: "Coupon not found" });
+        return;
+      }
+
+      res.json(coupon);
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  /**
+   * GET /coupons/tags?tags=tag1,tag2 - Get coupons by tags
+   */
+  getCouponsByTags(req: Request, res: Response): void {
+    try {
+      const tagsParam = req.query.tags as string;
+      const tags = tagsParam ? tagsParam.split(',').map(t => t.trim()) : [];
+
+      const coupons = db.getCouponsByTags(tags);
+      res.json(coupons);
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
+  /**
    * PUT /coupons/:id - Update a coupon
    */
   updateCoupon(req: Request, res: Response): void {
@@ -105,8 +149,10 @@ export class CouponController {
       const validatedData = UpdateCouponRequestSchema.parse(req.body);
 
       const updatedCoupon = db.updateCoupon(id, {
+        code: validatedData.code,
         type: validatedData.type,
         details: validatedData.details,
+        tags: validatedData.tags,
         expiration_date: validatedData.expiration_date,
       });
 
@@ -114,6 +160,10 @@ export class CouponController {
     } catch (error) {
       if (error instanceof ZodError) {
         this.handleZodError(error, res);
+        return;
+      }
+      if (error instanceof Error && error.message.includes('already exists')) {
+        res.status(409).json({ error: error.message });
         return;
       }
       res.status(500).json({ error: "Internal server error" });

@@ -4,9 +4,15 @@ import { Cart, CartWiseDetails, ProductWiseDetails, BxGyDetails } from '../types
 
 describe('CouponService', () => {
   let couponService: CouponService;
+  let couponCodeCounter = 0;
+
+  const generateCouponCode = () => {
+    return `TEST${++couponCodeCounter}`;
+  };
 
   beforeEach(() => {
     couponService = new CouponService();
+    couponCodeCounter = 0;
     // Clear database before each test
     db.getAllCoupons().forEach(c => db.deleteCoupon(c.id));
   });
@@ -14,7 +20,7 @@ describe('CouponService', () => {
   describe('Cart-wise coupons', () => {
     it('should apply 10% discount on cart over threshold', () => {
       const details: CartWiseDetails = { threshold: 100, discount: 10, discount_type: 'percentage' };
-      const coupon = db.createCoupon({ type: 'cart-wise', details });
+      const coupon = db.createCoupon({ code: generateCouponCode(), type: 'cart-wise', details });
 
       const cart: Cart = {
         items: [
@@ -30,7 +36,7 @@ describe('CouponService', () => {
 
     it('should not apply discount if cart is below threshold', () => {
       const details: CartWiseDetails = { threshold: 100, discount: 10, discount_type: 'percentage' };
-      db.createCoupon({ type: 'cart-wise', details });
+      db.createCoupon({ code: generateCouponCode(), type: 'cart-wise', details });
 
       const cart: Cart = {
         items: [{ product_id: 1, quantity: 1, price: 50 }],
@@ -42,7 +48,7 @@ describe('CouponService', () => {
 
     it('should apply discount when cart exactly equals threshold', () => {
       const details: CartWiseDetails = { threshold: 100, discount: 10, discount_type: 'percentage' };
-      db.createCoupon({ type: 'cart-wise', details });
+      db.createCoupon({ code: generateCouponCode(), type: 'cart-wise', details });
 
       const cart: Cart = {
         items: [{ product_id: 1, quantity: 1, price: 100 }],
@@ -56,7 +62,7 @@ describe('CouponService', () => {
   describe('Product-wise coupons', () => {
     it('should apply 20% discount on specific product', () => {
       const details: ProductWiseDetails = { product_id: 1, discount: 20, discount_type: 'percentage' };
-      db.createCoupon({ type: 'product-wise', details });
+      db.createCoupon({ code: generateCouponCode(), type: 'product-wise', details });
 
       const cart: Cart = {
         items: [
@@ -72,7 +78,7 @@ describe('CouponService', () => {
 
     it('should not apply if product is not in cart', () => {
       const details: ProductWiseDetails = { product_id: 3, discount: 20, discount_type: 'percentage' };
-      db.createCoupon({ type: 'product-wise', details });
+      db.createCoupon({ code: generateCouponCode(), type: 'product-wise', details });
 
       const cart: Cart = {
         items: [{ product_id: 1, quantity: 1, price: 100 }],
@@ -93,7 +99,7 @@ describe('CouponService', () => {
         get_products: [{ product_id: 3, quantity: 1 }],
         repition_limit: 2,
       };
-      db.createCoupon({ type: 'bxgy', details });
+      db.createCoupon({ code: generateCouponCode(), type: 'bxgy', details });
 
       const cart: Cart = {
         items: [
@@ -116,7 +122,7 @@ describe('CouponService', () => {
         get_products: [{ product_id: 2, quantity: 1 }],
         repition_limit: 1,
       };
-      db.createCoupon({ type: 'bxgy', details });
+      db.createCoupon({ code: generateCouponCode(), type: 'bxgy', details });
 
       const cart: Cart = {
         items: [
@@ -135,7 +141,7 @@ describe('CouponService', () => {
         get_products: [{ product_id: 2, quantity: 1 }],
         repition_limit: 2,
       };
-      db.createCoupon({ type: 'bxgy', details });
+      db.createCoupon({ code: generateCouponCode(), type: 'bxgy', details });
 
       const cart: Cart = {
         items: [
@@ -153,7 +159,7 @@ describe('CouponService', () => {
   describe('applyCoupon', () => {
     it('should apply cart-wise coupon and distribute discount', () => {
       const details: CartWiseDetails = { threshold: 100, discount: 10, discount_type: 'percentage' };
-      const coupon = db.createCoupon({ type: 'cart-wise', details });
+      const coupon = db.createCoupon({ code: generateCouponCode(), type: 'cart-wise', details });
 
       const cart: Cart = {
         items: [
@@ -170,7 +176,7 @@ describe('CouponService', () => {
 
     it('should apply product-wise coupon to specific item', () => {
       const details: ProductWiseDetails = { product_id: 1, discount: 50, discount_type: 'percentage' };
-      const coupon = db.createCoupon({ type: 'product-wise', details });
+      const coupon = db.createCoupon({ code: generateCouponCode(), type: 'product-wise', details });
 
       const cart: Cart = {
         items: [
@@ -193,6 +199,7 @@ describe('CouponService', () => {
     it('should throw error for expired coupon', () => {
       const details: CartWiseDetails = { threshold: 100, discount: 10, discount_type: 'percentage' };
       const coupon = db.createCoupon({
+        code: generateCouponCode(),
         type: 'cart-wise',
         details,
         expiration_date: '2020-01-01T00:00:00.000Z',
@@ -208,8 +215,8 @@ describe('CouponService', () => {
       const cartWiseDetails: CartWiseDetails = { threshold: 100, discount: 10, discount_type: 'percentage' };
       const productWiseDetails: ProductWiseDetails = { product_id: 1, discount: 20, discount_type: 'percentage' };
 
-      db.createCoupon({ type: 'cart-wise', details: cartWiseDetails });
-      db.createCoupon({ type: 'product-wise', details: productWiseDetails });
+      db.createCoupon({ code: generateCouponCode(), type: 'cart-wise', details: cartWiseDetails });
+      db.createCoupon({ code: generateCouponCode(), type: 'product-wise', details: productWiseDetails });
 
       const cart: Cart = {
         items: [
@@ -229,7 +236,7 @@ describe('CouponService', () => {
   describe('Edge cases', () => {
     it('should handle empty cart', () => {
       const details: CartWiseDetails = { threshold: 100, discount: 10, discount_type: 'percentage' };
-      db.createCoupon({ type: 'cart-wise', details });
+      db.createCoupon({ code: generateCouponCode(), type: 'cart-wise', details });
 
       const cart: Cart = { items: [] };
       const applicable = couponService.getApplicableCoupons(cart);
@@ -238,7 +245,7 @@ describe('CouponService', () => {
 
     it('should handle zero-price items', () => {
       const details: ProductWiseDetails = { product_id: 1, discount: 20, discount_type: 'percentage' };
-      db.createCoupon({ type: 'product-wise', details });
+      db.createCoupon({ code: generateCouponCode(), type: 'product-wise', details });
 
       const cart: Cart = {
         items: [{ product_id: 1, quantity: 5, price: 0 }],
@@ -257,7 +264,7 @@ describe('CouponService', () => {
           discount: 50,
           discount_type: 'fixed'
         };
-        const coupon = db.createCoupon({ type: 'cart-wise', details });
+        const coupon = db.createCoupon({ code: generateCouponCode(), type: 'cart-wise', details });
 
         const cart: Cart = {
           items: [
@@ -277,7 +284,7 @@ describe('CouponService', () => {
           discount: 1000,
           discount_type: 'fixed'
         };
-        const coupon = db.createCoupon({ type: 'cart-wise', details });
+        const coupon = db.createCoupon({ code: generateCouponCode(), type: 'cart-wise', details });
 
         const cart: Cart = {
           items: [{ product_id: 1, quantity: 1, price: 100 }],
@@ -294,7 +301,7 @@ describe('CouponService', () => {
           discount: 60,
           discount_type: 'fixed'
         };
-        const coupon = db.createCoupon({ type: 'cart-wise', details });
+        const coupon = db.createCoupon({ code: generateCouponCode(), type: 'cart-wise', details });
 
         const cart: Cart = {
           items: [
@@ -318,7 +325,7 @@ describe('CouponService', () => {
           discount: 30,
           discount_type: 'fixed'
         };
-        const coupon = db.createCoupon({ type: 'product-wise', details });
+        const coupon = db.createCoupon({ code: generateCouponCode(), type: 'product-wise', details });
 
         const cart: Cart = {
           items: [
@@ -338,7 +345,7 @@ describe('CouponService', () => {
           discount: 500,
           discount_type: 'fixed'
         };
-        const coupon = db.createCoupon({ type: 'product-wise', details });
+        const coupon = db.createCoupon({ code: generateCouponCode(), type: 'product-wise', details });
 
         const cart: Cart = {
           items: [
@@ -358,7 +365,7 @@ describe('CouponService', () => {
           discount: 40,
           discount_type: 'fixed'
         };
-        const coupon = db.createCoupon({ type: 'product-wise', details });
+        const coupon = db.createCoupon({ code: generateCouponCode(), type: 'product-wise', details });
 
         const cart: Cart = {
           items: [
@@ -381,7 +388,7 @@ describe('CouponService', () => {
           discount: 10,
           discount_type: 'percentage'
         };
-        db.createCoupon({ type: 'cart-wise', details });
+        db.createCoupon({ code: generateCouponCode(), type: 'cart-wise', details });
 
         const cart: Cart = {
           items: [{ product_id: 1, quantity: 1, price: 200 }],
@@ -397,7 +404,7 @@ describe('CouponService', () => {
           discount: 10,
           discount_type: 'fixed'
         };
-        db.createCoupon({ type: 'cart-wise', details });
+        db.createCoupon({ code: generateCouponCode(), type: 'cart-wise', details });
 
         const cart: Cart = {
           items: [{ product_id: 1, quantity: 1, price: 200 }],
@@ -412,6 +419,7 @@ describe('CouponService', () => {
   describe('Master coupons', () => {
     it('should apply 100% discount to entire cart', () => {
       const coupon = db.createCoupon({
+        code: generateCouponCode(),
         type: 'master',
         details: {}
       });
@@ -432,6 +440,7 @@ describe('CouponService', () => {
 
     it('should distribute 100% discount across all items', () => {
       const coupon = db.createCoupon({
+        code: generateCouponCode(),
         type: 'master',
         details: {}
       });
@@ -451,6 +460,7 @@ describe('CouponService', () => {
 
     it('should show master coupon in applicable coupons list', () => {
       db.createCoupon({
+        code: generateCouponCode(),
         type: 'master',
         details: {}
       });
@@ -470,6 +480,7 @@ describe('CouponService', () => {
 
     it('should not allow master coupon to be applied twice to same cart', () => {
       const coupon = db.createCoupon({
+        code: generateCouponCode(),
         type: 'master',
         details: {}
       });
@@ -491,6 +502,7 @@ describe('CouponService', () => {
 
     it('should allow master coupon for different carts', () => {
       const coupon = db.createCoupon({
+        code: generateCouponCode(),
         type: 'master',
         details: {}
       });
@@ -515,6 +527,7 @@ describe('CouponService', () => {
 
     it('should use default cart_id if not provided', () => {
       const coupon = db.createCoupon({
+        code: generateCouponCode(),
         type: 'master',
         details: {}
       });
@@ -535,6 +548,7 @@ describe('CouponService', () => {
 
     it('should not show master coupon if already used for cart', () => {
       const coupon = db.createCoupon({
+        code: generateCouponCode(),
         type: 'master',
         details: {}
       });
@@ -558,12 +572,207 @@ describe('CouponService', () => {
 
     it('should work with empty details object', () => {
       const coupon = db.createCoupon({
+        code: generateCouponCode(),
         type: 'master',
         details: {}
       });
 
       expect(coupon.type).toBe('master');
       expect(coupon.details).toEqual({});
+    });
+  });
+
+  describe('Coupon codes and tags', () => {
+    it('should create coupon with unique code', () => {
+      const coupon = db.createCoupon({
+        code: 'DIWALI100',
+        type: 'cart-wise',
+        details: { threshold: 100, discount: 20, discount_type: 'percentage' }
+      });
+
+      expect(coupon.code).toBe('DIWALI100');
+    });
+
+    it('should enforce unique codes (case-insensitive)', () => {
+      db.createCoupon({
+        code: 'NEWYEAR2025',
+        type: 'cart-wise',
+        details: { threshold: 100, discount: 10, discount_type: 'percentage' }
+      });
+
+      expect(() => {
+        db.createCoupon({
+          code: 'newyear2025', // lowercase should conflict
+          type: 'product-wise',
+          details: { product_id: 1, discount: 5, discount_type: 'fixed' }
+        });
+      }).toThrow("Coupon code 'newyear2025' already exists");
+    });
+
+    it('should store codes in uppercase', () => {
+      const coupon = db.createCoupon({
+        code: 'summer50',
+        type: 'cart-wise',
+        details: { threshold: 200, discount: 50, discount_type: 'fixed' }
+      });
+
+      expect(coupon.code).toBe('SUMMER50');
+    });
+
+    it('should retrieve coupon by code', () => {
+      const created = db.createCoupon({
+        code: 'WINTER25',
+        type: 'cart-wise',
+        details: { threshold: 150, discount: 25, discount_type: 'percentage' }
+      });
+
+      const retrieved = db.getCouponByCode('WINTER25');
+      expect(retrieved).toBeDefined();
+      expect(retrieved?.id).toBe(created.id);
+    });
+
+    it('should retrieve coupon by code case-insensitively', () => {
+      db.createCoupon({
+        code: 'HOLIDAY30',
+        type: 'cart-wise',
+        details: { threshold: 100, discount: 30, discount_type: 'percentage' }
+      });
+
+      const retrieved = db.getCouponByCode('holiday30');
+      expect(retrieved).toBeDefined();
+      expect(retrieved?.code).toBe('HOLIDAY30');
+    });
+
+    it('should return undefined for non-existent code', () => {
+      const retrieved = db.getCouponByCode('NONEXISTENT');
+      expect(retrieved).toBeUndefined();
+    });
+
+    it('should create coupon with tags', () => {
+      const coupon = db.createCoupon({
+        code: 'FESTIVAL10',
+        type: 'cart-wise',
+        details: { threshold: 100, discount: 10, discount_type: 'percentage' },
+        tags: ['seasonal', 'festival', 'limited-time']
+      });
+
+      expect(coupon.tags).toEqual(['seasonal', 'festival', 'limited-time']);
+    });
+
+    it('should filter coupons by single tag', () => {
+      db.createCoupon({
+        code: 'DIWALI50',
+        type: 'cart-wise',
+        details: { threshold: 100, discount: 50, discount_type: 'fixed' },
+        tags: ['seasonal', 'diwali']
+      });
+
+      db.createCoupon({
+        code: 'HOLI20',
+        type: 'cart-wise',
+        details: { threshold: 200, discount: 20, discount_type: 'percentage' },
+        tags: ['seasonal', 'holi']
+      });
+
+      db.createCoupon({
+        code: 'EVERYDAY5',
+        type: 'cart-wise',
+        details: { threshold: 50, discount: 5, discount_type: 'percentage' },
+        tags: ['regular']
+      });
+
+      const seasonalCoupons = db.getCouponsByTags(['seasonal']);
+      expect(seasonalCoupons.length).toBe(2);
+      expect(seasonalCoupons.some(c => c.code === 'DIWALI50')).toBe(true);
+      expect(seasonalCoupons.some(c => c.code === 'HOLI20')).toBe(true);
+    });
+
+    it('should filter coupons by multiple tags (OR logic)', () => {
+      db.createCoupon({
+        code: 'TAG1',
+        type: 'cart-wise',
+        details: { threshold: 100, discount: 10, discount_type: 'percentage' },
+        tags: ['winter', 'clearance']
+      });
+
+      db.createCoupon({
+        code: 'TAG2',
+        type: 'cart-wise',
+        details: { threshold: 100, discount: 15, discount_type: 'percentage' },
+        tags: ['summer', 'clearance']
+      });
+
+      db.createCoupon({
+        code: 'TAG3',
+        type: 'cart-wise',
+        details: { threshold: 100, discount: 20, discount_type: 'percentage' },
+        tags: ['exclusive']
+      });
+
+      const clearanceCoupons = db.getCouponsByTags(['clearance', 'exclusive']);
+      expect(clearanceCoupons.length).toBe(3); // All three match at least one tag
+    });
+
+    it('should match tags case-insensitively', () => {
+      db.createCoupon({
+        code: 'CASEMATCH',
+        type: 'cart-wise',
+        details: { threshold: 100, discount: 10, discount_type: 'percentage' },
+        tags: ['Premium', 'VIP']
+      });
+
+      const results = db.getCouponsByTags(['premium', 'vip']);
+      expect(results.length).toBe(1);
+      expect(results[0].code).toBe('CASEMATCH');
+    });
+
+    it('should return all coupons when no tags provided', () => {
+      const count = db.getAllCoupons().length;
+      const results = db.getCouponsByTags([]);
+      expect(results.length).toBe(count);
+    });
+
+    it('should return empty array when filtering by non-existent tag', () => {
+      const results = db.getCouponsByTags(['nonexistent-tag']);
+      expect(results.length).toBe(0);
+    });
+
+    it('should not return coupons without tags when filtering', () => {
+      db.createCoupon({
+        code: 'NOTAGS',
+        type: 'cart-wise',
+        details: { threshold: 100, discount: 10, discount_type: 'percentage' }
+        // No tags
+      });
+
+      const results = db.getCouponsByTags(['any-tag']);
+      expect(results.some(c => c.code === 'NOTAGS')).toBe(false);
+    });
+
+    it('should update code index when coupon code is updated', () => {
+      const coupon = db.createCoupon({
+        code: 'OLDCODE',
+        type: 'cart-wise',
+        details: { threshold: 100, discount: 10, discount_type: 'percentage' }
+      });
+
+      db.updateCoupon(coupon.id, { code: 'NEWCODE' });
+
+      expect(db.getCouponByCode('OLDCODE')).toBeUndefined();
+      expect(db.getCouponByCode('NEWCODE')).toBeDefined();
+      expect(db.getCouponByCode('NEWCODE')?.id).toBe(coupon.id);
+    });
+
+    it('should delete code index when coupon is deleted', () => {
+      const coupon = db.createCoupon({
+        code: 'TODELETE',
+        type: 'cart-wise',
+        details: { threshold: 100, discount: 10, discount_type: 'percentage' }
+      });
+
+      db.deleteCoupon(coupon.id);
+
+      expect(db.getCouponByCode('TODELETE')).toBeUndefined();
     });
   });
 });

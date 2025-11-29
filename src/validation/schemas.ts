@@ -55,8 +55,14 @@ export const CouponTypeSchema = z.enum(['cart-wise', 'product-wise', 'bxgy', 'ma
 
 // Create coupon request schema with discriminated union
 export const CreateCouponRequestSchema = z.object({
+  code: z.string()
+    .min(3, 'Coupon code must be at least 3 characters')
+    .max(50, 'Coupon code must be at most 50 characters')
+    .regex(/^[A-Z0-9_-]+$/i, 'Coupon code can only contain letters, numbers, hyphens, and underscores')
+    .transform(val => val.toUpperCase()),
   type: CouponTypeSchema,
   details: z.any(),
+  tags: z.array(z.string()).optional(),
   expiration_date: z.string().datetime().optional(),
 }).superRefine((data, ctx) => {
   // Validate details based on type
@@ -105,8 +111,15 @@ export const CreateCouponRequestSchema = z.object({
 
 // Update coupon request schema
 export const UpdateCouponRequestSchema = z.object({
+  code: z.string()
+    .min(3, 'Coupon code must be at least 3 characters')
+    .max(50, 'Coupon code must be at most 50 characters')
+    .regex(/^[A-Z0-9_-]+$/i, 'Coupon code can only contain letters, numbers, hyphens, and underscores')
+    .transform(val => val.toUpperCase())
+    .optional(),
   type: CouponTypeSchema.optional(),
   details: z.any().optional(),
+  tags: z.array(z.string()).optional(),
   expiration_date: z.string().datetime().optional(),
 });
 
